@@ -225,3 +225,141 @@ def place_test(o_list, num_A_block, num_B_block, num_C_block, grid_size,
         elif num_A_block == 0:
             pass
         o_list.extend(A)
+
+
+# check if the lazor hit the block
+def hit_block(l_info):
+    x, y, vx, vy = l_info
+    if (x * 2) % 2 == 0:
+        block_y = y - 0.5
+        block_x = x
+        if vx < 0:
+            block_x -= 1
+    else:
+        block_x = x - 0.5
+        block_y = y
+        if vy < 0:
+            block_y -= 1
+    return (block_x, block_y)
+
+
+# check the direction of the lazor
+# whether it touch the sides of the block or the top-bottoms
+def reflect_info(info):
+    x, y, vx, vy = info
+    if (x * 2) % 2 == 0:  # x is int
+        vx *= -1
+    else:
+        vy *= -1
+    return (x + vx, y + vy, vx, vy)
+
+
+# test if the arrangement of the block can be satisfied hte requirement
+def test_block(grid_size, block_info, l_list, p_list):
+
+    target_set = set([(x[0], x[1]) for x in p_list])
+    path_check = set()
+    block_dict = {}
+    for b in block_info:
+        block_dict[(b[1], b[2])] = b[0]
+
+    def hit(l_info):
+        x, y, vx, vy = l_info
+        if l_info in path_check:
+            return
+        # check no repeat path
+        path_check.add(l_info)
+        target_set.discard((x, y))
+        b_pos = hit_block(l_info)
+        # check if the lazor is in the grid
+        if not (0 <= b_pos[0] < grid_size[0] and 0 <= b_pos[1] < grid_size[1]):
+            return
+        # if lazor does not hit any block, keep moving in the same direction
+        if b_pos not in block_dict:
+            hit((x + vx, y + vy, vx, vy))
+        # if lazor hit the block, do the action accordingly
+        else:
+            block_type = block_dict[b_pos]
+            if block_type == 'A':
+                hit(reflect_info(l_info))
+            elif block_type == 'B':
+                return
+            elif block_type == 'C':
+                hit(reflect_info(l_info))
+                hit((x + vx, y + vy, vx, vy))
+    # do all the lazor
+    for l in l_list:
+        hit((l[0], l[1], l[2], l[3]))
+    # if the targets are all passed
+    return len(target_set) == 0
+
+
+def output_image(filename, grid_size, x_list, B_list, block_info):
+
+    # adustment of the style of the output images
+    plt.xlim(0, grid_size[0])
+    plt.ylim(0, grid_size[1])
+    plt.axes().set_aspect('equal')
+    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(1))
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(1))
+    plt.grid(True)
+    # draw different type of block with different color
+    for i in block_info:
+        block_type = i[0]
+        x = i[1]
+        y = i[2]
+
+        if block_type == "A":
+            rect = plt.Rectangle((x, y), 1, 1, fc='lightgray', ec="black")
+            plt.gca().add_patch(rect)
+
+        elif block_type == "B":
+            rect = plt.Rectangle((x, y), 1, 1, fc='dimgray', ec="black")
+            plt.gca().add_patch(rect)
+
+        elif block_type == "C":
+            rect = plt.Rectangle((x, y), 1, 1, fc='lightblue', ec="black")
+            plt.gca().add_patch(rect)
+    # draw the poisiton which cannot be placed with black
+    for i in x_list:
+        x = i[0]
+        y = i[1]
+        rect = plt.Rectangle((x, y), 1, 1, fc='black', ec="black")
+        plt.gca().add_patch(rect)
+    # draw the fixed opague block
+    for i in B_list:
+        x = i[0]
+        y = i[1]
+        rect = plt.Rectangle((x, y), 1, 1, fc='dimgray', ec="black")
+        plt.gca().add_patch(rect)
+    # make the legend
+    reflect_block = mpatches.Patch(color='lightgray', label='Reflect block')
+    opague_block = mpatches.Patch(color='dimgray', label='Opague block')
+    refractive_block = mpatches.Patch(
+        color='lightblue', label='Refractive block')
+    X = mpatches.Patch(color='black', label='Cannot be placed')
+    plt.legend(handles=[reflect_block, opague_block, refractive_block, X],
+               bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
+               mode="expand", borderaxespad=0, ncol=2)
+    fptr = '.'.join(filename.split(".")[0:-1])
+    plt.savefig(fptr + '.png')
+    plt.show()
+
+
+if __name__ == "__main__":
+    filename = "yarn_5.bff"
+    read = Reader(filename)
+    graph_info = read.reader()
+    o_list = graph_info['o_list']
+    num_A_block = graph_info['num_A_block']
+    num_B_block = graph_info['num_B_block']
+    num_C_block = graph_info['num_C_block']
+    B_list = graph_info['B_list']
+    grid_size = graph_info['Grid_size']
+    l_list = graph_info['Lazor']
+    p_list = graph_info['P_list']
+    x_list = graph_info['x_list']
+    block_info = place_test(
+        o_list, num_A_block, num_B_block, num_C_block, grid_size,
+        l_list, p_list)
+    output_image(filename, grid_size, x_list, B_list, block_info)
